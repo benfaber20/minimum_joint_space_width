@@ -1,0 +1,169 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "\n",
+    "from math import pi,sqrt\n",
+    "import numpy as np\n",
+    "import circle_fit as cf\n",
+    "import matplotlib.pyplot as plt\n",
+    "import scipy\n",
+    "from scipy import interpolate\n",
+    "from scipy.interpolate import interp1d\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#function reads pts file and return a 2-d numpy array of points\n",
+    "def read_points_file(ptsfile_name):\n",
+    "    points_list = []\n",
+    "    with open(ptsfile_name) as f:\n",
+    "        for line in f:\n",
+    "            if \"{\" in line or \"version:\" in line or \"n_points:\" in line:\n",
+    "                continue        # Ignore tags\n",
+    "            if line.isspace():\n",
+    "                continue        # Ignore any empty lines.\n",
+    "            if \"}\" in line:\n",
+    "                break           # Terminate when we hit the enclosing bracket at the end of the IMAGES section\n",
+    "            x, y = line.split()\n",
+    "            points_list.append([x,y])\n",
+    "    return np.asarray(points_list, dtype=np.float32) \n",
+    "            "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#function writes a 2-d numpy array of points to a newly-created file. \n",
+    "def create_points_file(ptsfile_name, points):\n",
+    "    f = open(ptsfile_name,'w')\n",
+    "    f.write('version: 1' + '\\n')\n",
+    "    f.write('n_points: ' + str(len(points)) + '\\n')\n",
+    "    f.write('{\\n')\n",
+    "    for i in range(len(points)):\n",
+    "        f.write(str(points[i][0])+' '+ str(points[i][1])+'\\n')\n",
+    "    f.write('}')\n",
+    "    f.close()\n",
+    "        "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#function returns the shortest distance between point x and the line segment ab.\n",
+    "def shortest_distance_from_point_to_segment(x,a, b):\n",
+    "    u = (b-a) / np.linalg.norm(b-a)\n",
+    "    c= np.dot(u,x-a)\n",
+    "    r= np.linalg.norm(x-a)\n",
+    "    v= np.linalg.norm(b-a)\n",
+    "    l=0\n",
+    "    if c < 0:\n",
+    "        d= r\n",
+    "        l= -1\n",
+    "        z = a\n",
+    "    elif c > v:\n",
+    "        d= np.linalg.norm(x-b)\n",
+    "        l= 1\n",
+    "        z = b\n",
+    "    else: \n",
+    "        d= sqrt(r*r-c*c) # distance\n",
+    "        z = a + c*u # point\n",
+    "    return d,l,z\n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def mJSW(points):\n",
+    "    #defining mJSW\n",
+    "    acetabulum = list(range(END_POINT_NUMBER,START_POINT_NUMBER_MINUS_1,-1)) #ACETABULAR POINTS - note python does not count initial point so \"(84,77,-1)\" would be points 78-84 inclusive\n",
+    "    #print (acetabulum),\n",
+    "    fem_head = list(range(START_POINT_NUMBER, END_POINT_NUMBER_PLUS_1})) #\"(22,32)\" would be points 22-31 inclusive\n",
+    "    #print (fem_head)\n",
+    "\n",
+    "    dmin = 10000\n",
+    "    for i in fem_head:\n",
+    "        for j in acetabulum:\n",
+    "            #print(j)\n",
+    "            d, l, z = shortest_distance_from_point_to_segment(points [i], points [j], points [j-1])\n",
+    "            if d < dmin:\n",
+    "                dmin = d\n",
+    "                zmin = z\n",
+    "                index_min =i\n",
+    "\n",
+    "    for m in acetabulum:\n",
+    "        for n in fem_head :\n",
+    "            #print(i)\n",
+    "            d, l, z = shortest_distance_from_point_to_segment(points [m], points [n], points [n+1])\n",
+    "            if d < dmin:\n",
+    "                dmin = d\n",
+    "                zmin = z\n",
+    "                index_min =m\n",
+    "    #print (\"the shortest distance d:\" ,dmin)\n",
+    "    #print (\"the intersect point z: \", zmin)\n",
+    "    #print (\"the index of the nearest point to z:\" , index_min)\n",
+    "    return   dmin,zmin,index_min"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Example: how to run the function mJSW on all pts files listed in the file \"jsw_6807.txt\", \n",
+    "#writing the outputs to csv file.\n",
+    "pts_files = open('IMAGE_LIST_FILE', 'r+')\n",
+    "f1 = open('OUTPUT_FILE_NAME','w')\n",
+    "for pts_file in pts_files:\n",
+    "    print (\"working on file: \"+pts_file[:-1])\n",
+    "    points = read_points_file(\"PATH_TO_POINTS_FILES/\"+pts_file[:-1])\n",
+    "    d,z,index = mJSW(points)\n",
+    "    \n",
+    "    f1.write(str(pts_file)+\",\"+str(d)+\",\"+str(index)+\",\"+'\\n')\n",
+    "    \n",
+    "f1.close()\n",
+    "pts_files.close()"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.7"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
